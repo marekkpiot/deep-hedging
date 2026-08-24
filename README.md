@@ -1,57 +1,57 @@
 # Deep Hedging
 
-Projet pédagogique de couverture d'une option européenne avec un réseau de neurones entraîné sous PyTorch.
+Educational project on hedging a European option using a neural network trained with PyTorch.
 
-L'objectif est de comparer deux méthodes de couverture :
+The objective is to compare two hedging methods:
 
-- le delta-hedging classique de Black-Scholes ;
-- une stratégie de deep hedging apprise par un réseau de neurones.
+* classical Black-Scholes delta hedging;
+* a deep hedging strategy learned by a neural network.
 
-Le réseau n'apprend pas directement la formule du delta Black-Scholes. Il apprend uniquement à choisir une position de couverture afin de réduire le risque du PnL final.
+The network does not directly learn the Black-Scholes delta formula. It only learns how to choose a hedging position in order to reduce the risk of the final PnL.
 
 ---
 
-## Objectif du projet
+## Project Objective
 
-On considère une banque ayant vendu un call européen.
+We consider a bank that has sold a European call option.
 
-À l'échéance, elle doit verser au détenteur du call :
+At maturity, it must pay the option holder:
 
 ```text
 payoff = max(S_T - K, 0)
 ```
 
-où :
+where:
 
 ```text
-S_T = prix de l'action à l'échéance
-K   = strike de l'option
+S_T = stock price at maturity
+K   = option strike
 ```
 
-Si l'action monte fortement, le payoff peut devenir important.
+If the stock price increases significantly, the payoff can become large.
 
-La banque cherche donc à réduire ce risque en achetant ou vendant régulièrement des actions.
+The bank therefore seeks to reduce this risk by regularly buying or selling shares of the underlying stock.
 
-Le problème consiste à déterminer :
+The problem is to determine:
 
 ```text
-Combien d'actions faut-il détenir
-à chaque date pour couvrir le call ?
+How many shares should be held
+at each date to hedge the call?
 ```
 
-Deux méthodes sont étudiées :
+Two methods are studied:
 
 ```text
 Black-Scholes
-→ utilise une formule analytique pour calculer le delta
+→ uses an analytical formula to compute the delta
 
 Deep Hedging
-→ utilise un réseau de neurones entraîné sur des trajectoires simulées
+→ uses a neural network trained on simulated paths
 ```
 
 ---
 
-# Structure du projet
+# Project Structure
 
 ```text
 deep-hedging/
@@ -84,37 +84,37 @@ deep-hedging/
 └── README.md
 ```
 
-Le fichier `hedging_network.pt` contient les paramètres appris du réseau. Il peut être exclu du dépôt GitHub si les modèles entraînés sont ignorés dans `.gitignore`.
+The `hedging_network.pt` file contains the learned parameters of the neural network. It can be excluded from the GitHub repository if trained models are ignored in `.gitignore`.
 
 ---
 
 # Installation
 
-Créer un environnement virtuel :
+Create a virtual environment:
 
 ```powershell
 python -m venv .venv
 ```
 
-Sous PowerShell, il peut être nécessaire d'autoriser temporairement l'exécution des scripts :
+On PowerShell, it may be necessary to temporarily allow script execution:
 
 ```powershell
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
 ```
 
-Activer ensuite l'environnement :
+Then activate the environment:
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
 ```
 
-Installer les dépendances :
+Install the dependencies:
 
 ```powershell
 python -m pip install -r requirements.txt
 ```
 
-Les principales bibliothèques utilisées sont :
+The main libraries used are:
 
 ```text
 PyTorch
@@ -125,9 +125,9 @@ SciPy
 
 ---
 
-# Ordre d'exécution
+# Execution Order
 
-Les différents scripts peuvent être exécutés dans l'ordre suivant :
+The different scripts can be executed in the following order:
 
 ```powershell
 python torch_check.py
@@ -140,11 +140,11 @@ python compare_hedging.py
 
 ---
 
-# 1. Simulation du prix de l'action
+# 1. Stock Price Simulation
 
-Les trajectoires de l'action sont simulées avec un mouvement brownien géométrique.
+Stock price paths are simulated using a geometric Brownian motion.
 
-La discrétisation utilisée est :
+The discretization used is:
 
 ```text
 S_(t+dt)
@@ -158,281 +158,281 @@ exp(
 )
 ```
 
-avec :
+with:
 
 ```text
-S_t   = prix actuel
-r     = taux sans risque
-sigma = volatilité
-dt    = durée d'un pas temporel
-Z     = variable normale N(0,1)
+S_t   = current stock price
+r     = risk-free rate
+sigma = volatility
+dt    = time-step length
+Z     = standard normal random variable N(0,1)
 ```
 
-Le code correspondant se trouve dans :
+The corresponding code is located in:
 
 ```text
 src/gbm.py
 ```
 
-PyTorch permet de simuler simultanément plusieurs milliers de trajectoires.
+PyTorch makes it possible to simulate several thousand paths simultaneously.
 
-Un tenseur contenant :
+For example, a tensor containing:
 
 ```text
-5000 trajectoires
+5000 paths
 31 dates
 ```
 
-possède par exemple la forme :
+has the shape:
 
 ```text
 torch.Size([5000, 31])
 ```
 
-Chaque ligne correspond à une trajectoire et chaque colonne à une date.
+Each row corresponds to one path and each column to one date.
 
-Le graphique des trajectoires simulées est enregistré dans :
+The simulated path figure is saved in:
 
 ```text
 figures/gbm_paths.png
 ```
 
-![Trajectoires GBM](figures/gbm_paths.png)
+![GBM Paths](figures/gbm_paths.png)
 
 ---
 
-# 2. Prix du call Black-Scholes
+# 2. Black-Scholes Call Price
 
-La banque vend initialement le call et reçoit sa prime.
+The bank initially sells the call and receives the option premium.
 
-Le prix théorique du call est calculé avec la formule de Black-Scholes dans :
+The theoretical call price is calculated using the Black-Scholes formula in:
 
 ```text
 src/black_scholes.py
 ```
 
-Sous la probabilité risque-neutre :
+Under the risk-neutral probability measure:
 
 ```text
-prix du call aujourd'hui
+call price today
 =
-payoff moyen risque-neutre actualisé
+discounted risk-neutral expected payoff
 ```
 
-Autrement dit :
+In other words:
 
 ```text
-prix du call
+call price
 =
 exp(-rT)
 ×
-espérance risque-neutre du payoff
+risk-neutral expectation of the payoff
 ```
 
-Les trajectoires utilisées dans le projet sont donc simulées avec une dérive égale au taux sans risque.
+The paths used in the project are therefore simulated with a drift equal to the risk-free rate.
 
 ---
 
-# 3. Principe du hedging
+# 3. Hedging Principle
 
-Une banque ayant vendu un call perd lorsque la valeur du call augmente.
+A bank that has sold a call loses money when the value of the call increases.
 
-Pour réduire ce risque, elle achète des actions.
+To reduce this risk, it buys shares of the underlying stock.
 
-Par exemple :
+For example:
 
 ```text
-Delta du call = 0,60
+Call delta = 0.60
 
-L'action monte de 1 €
-→ le call augmente approximativement de 0,60 €
+The stock rises by €1
+→ the call increases by approximately €0.60
 
-La banque possède 0,60 action
-→ les actions gagnent approximativement 0,60 €
+The bank owns 0.60 shares
+→ the shares gain approximately €0.60
 ```
 
-Les deux mouvements se compensent en partie.
+The two movements partially offset each other.
 
-La position doit cependant être régulièrement réajustée car le delta évolue avec :
+However, the position must be regularly rebalanced because the delta changes with:
 
 ```text
-le prix de l'action
-le temps restant
-la volatilité
-le strike
+the stock price
+the remaining time
+the volatility
+the strike
 ```
 
 ---
 
-# 4. Portefeuille de couverture
+# 4. Hedging Portfolio
 
-Le portefeuille de la banque contient :
+The bank's portfolio contains:
 
 ```text
-un compte en espèces
+a cash account
 +
-une position en actions
+a stock position
 -
-le call vendu
+the short call
 ```
 
-Lorsqu'elle modifie sa couverture :
+When the bank changes its hedge:
 
 ```text
-nombre d'actions achetées
+number of shares purchased
 =
-nouvelle position - ancienne position
+new position - previous position
 ```
 
-Le coût du rééquilibrage est :
+The rebalancing cost is:
 
 ```text
-coût
+cost
 =
-nombre d'actions achetées × prix actuel
+number of shares purchased × current stock price
 ```
 
-Le compte en espèces est mis à jour à chaque date.
+The cash account is updated at each date.
 
-S'il est positif, il produit des intérêts.
+If it is positive, it earns interest.
 
-S'il est négatif, il représente une dette et génère un coût d'emprunt.
+If it is negative, it represents borrowing and generates an interest cost.
 
 ---
 
-# 5. PnL final
+# 5. Final PnL
 
-Le PnL utilisé dans l'entraînement est calculé uniquement à l'échéance.
+The PnL used during training is calculated only at maturity.
 
-Pendant la trajectoire, le programme met à jour :
+During each path, the program updates:
 
 ```text
-la position en actions
-le cash
-les achats et ventes
-les intérêts
+the stock position
+the cash account
+the purchases and sales
+the interest
 ```
 
-À l'échéance :
+At maturity:
 
 ```text
-richesse finale
+final hedging wealth
 =
-cash final
+final cash
 +
-position finale × prix terminal
+final position × terminal stock price
 ```
 
-Le call doit ensuite être payé :
+The call payoff must then be paid:
 
 ```text
-PnL final
+final PnL
 =
-richesse finale
+final hedging wealth
 -
-payoff du call
+call payoff
 ```
 
-Chaque trajectoire produit donc un seul PnL final.
+Each path therefore produces one final PnL.
 
-Avec :
+With:
 
 ```text
-10 000 trajectoires
+10,000 paths
 ```
 
-on obtient :
+we obtain:
 
 ```text
-10 000 PnL finaux
+10,000 final PnL values
 ```
 
 ---
 
-# 6. Réseau de neurones
+# 6. Neural Network
 
-Le réseau est défini dans :
+The neural network is defined in:
 
 ```text
 src/hedging_network.py
 ```
 
-Il reçoit trois informations :
+It receives three pieces of information:
 
 ```text
-1. prix de l'action / strike
-2. proportion de temps restant
-3. position de couverture actuelle
+1. stock price / strike
+2. proportion of time remaining
+3. current hedging position
 ```
 
-La première variable correspond au moneyness :
+The first variable corresponds to moneyness:
 
 ```text
 moneyness = S / K
 ```
 
-Exemples :
+Examples:
 
 ```text
 S / K < 1
-→ action sous le strike
+→ stock price below the strike
 
 S / K = 1
-→ action au strike
+→ stock price at the strike
 
 S / K > 1
-→ action au-dessus du strike
+→ stock price above the strike
 ```
 
-Le réseau produit une seule sortie :
+The network produces a single output:
 
 ```text
-nouvelle position de couverture
+new hedging position
 ```
 
-Une fonction sigmoid limite cette position entre 0 et 1.
+A sigmoid function constrains this position between 0 and 1.
 
 ---
 
-# 7. Architecture du réseau
+# 7. Neural Network Architecture
 
-L'architecture utilisée est :
+The architecture used is:
 
 ```text
-3 entrées
+3 inputs
     ↓
-Linear : 3 → 16
-    ↓
-ReLU
-    ↓
-Linear : 16 → 16
+Linear: 3 → 16
     ↓
 ReLU
     ↓
-Linear : 16 → 1
+Linear: 16 → 16
+    ↓
+ReLU
+    ↓
+Linear: 16 → 1
     ↓
 Sigmoid
     ↓
-position de couverture
+hedging position
 ```
 
-Le réseau contient 353 paramètres ajustables.
+The network contains 353 trainable parameters.
 
-Ces paramètres sont constitués des poids et des biais des différentes couches.
+These parameters consist of the weights and biases of the different layers.
 
-Au début de l'entraînement, ils sont initialisés automatiquement.
+At the beginning of training, they are automatically initialized.
 
 ---
 
-# 8. Fonction ReLU
+# 8. ReLU Function
 
-La fonction ReLU est définie par :
+The ReLU function is defined as:
 
 ```text
 ReLU(x) = max(0, x)
 ```
 
-Exemples :
+Examples:
 
 ```text
 ReLU(-2) = 0
@@ -440,96 +440,96 @@ ReLU(0)  = 0
 ReLU(3)  = 3
 ```
 
-Elle introduit une non-linéarité dans le réseau.
+It introduces non-linearity into the network.
 
-Sans fonction d'activation non linéaire, plusieurs couches linéaires successives resteraient équivalentes à une seule transformation linéaire.
+Without a non-linear activation function, several successive linear layers would remain equivalent to a single linear transformation.
 
 ---
 
-# 9. Fonction sigmoid
+# 9. Sigmoid Function
 
-La dernière couche utilise une sigmoid.
+The final layer uses a sigmoid function.
 
-Elle transforme n'importe quelle valeur en un nombre compris entre 0 et 1.
+It transforms any input value into a number between 0 and 1.
 
 ```text
-entrée très négative
-→ sortie proche de 0
+very negative input
+→ output close to 0
 
-entrée proche de 0
-→ sortie proche de 0,5
+input close to 0
+→ output close to 0.5
 
-entrée très positive
-→ sortie proche de 1
+very positive input
+→ output close to 1
 ```
 
-La sortie peut donc être directement interprétée comme une quantité d'actions à détenir.
+The output can therefore be directly interpreted as the number of shares to hold.
 
 ---
 
 # 10. Deep Hedging
 
-À chaque date, le réseau reçoit :
+At each date, the network receives:
 
 ```text
-[S_t / K, temps restant, position actuelle]
+[S_t / K, time remaining, current position]
 ```
 
-et renvoie :
+and returns:
 
 ```text
-nouvelle position
+new position
 ```
 
-Le même réseau est utilisé à toutes les dates.
+The same network is used at every date.
 
-Il n'existe donc pas un réseau différent pour chaque étape temporelle.
+There is therefore not a different network for each time step.
 
-Le processus est :
+The process is:
 
 ```text
-état actuel
+current state
       ↓
-réseau
+network
       ↓
-nouvelle position
+new position
       ↓
-achat ou vente d'actions
+buy or sell shares
       ↓
-mise à jour du cash
+update cash account
       ↓
-date suivante
+next date
 ```
 
-Ce processus est répété jusqu'à l'échéance.
+This process is repeated until maturity.
 
 ---
 
-# 11. Fonction de perte
+# 11. Loss Function
 
-Le réseau est entraîné pour réduire la dispersion du PnL final.
+The network is trained to reduce the dispersion of the final PnL.
 
-La loss utilisée est la variance du PnL :
+The loss used is the variance of the PnL:
 
 ```text
-PnL moyen
+mean PnL
 =
-moyenne des PnL
+average of the PnL values
 
-PnL centré
+centered PnL
 =
-PnL - PnL moyen
+PnL - mean PnL
 
 loss
 =
-moyenne des PnL centrés au carré
+average of squared centered PnL values
 ```
 
-Une faible variance signifie que les résultats du portefeuille sont plus concentrés.
+A low variance means that the portfolio outcomes are more concentrated.
 
-Le PnL moyen est également surveillé afin d'éviter qu'une faible variance masque un biais important.
+The mean PnL is also monitored to ensure that a low variance does not hide a significant bias.
 
-La fonction de perte se trouve dans :
+The loss function is located in:
 
 ```text
 src/losses.py
@@ -537,25 +537,25 @@ src/losses.py
 
 ---
 
-# 12. Descente de gradient
+# 12. Gradient Descent
 
-L'entraînement suit le processus :
+Training follows the process:
 
 ```text
-poids du réseau
+network weights
        ↓
-positions de couverture
+hedging positions
        ↓
-PnL final
+final PnL
        ↓
 loss
        ↓
-calcul des gradients
+gradient computation
        ↓
-modification des poids
+weight updates
 ```
 
-Le cœur de l'entraînement PyTorch est :
+The core PyTorch training loop is:
 
 ```python
 optimizer.zero_grad()
@@ -567,571 +567,567 @@ optimizer.step()
 
 ## `zero_grad`
 
-Efface les gradients calculés lors de l'étape précédente.
+Clears the gradients computed during the previous training step.
 
 ## `backward`
 
-Effectue la rétropropagation.
+Performs backpropagation.
 
-PyTorch calcule automatiquement l'influence de chaque paramètre du réseau sur la loss.
+PyTorch automatically computes the influence of each network parameter on the loss.
 
 ## `step`
 
-L'optimizer modifie les paramètres à partir des gradients obtenus.
+The optimizer updates the parameters using the computed gradients.
 
 ---
 
-# 13. Optimizer Adam
+# 13. Adam Optimizer
 
-Le projet utilise Adam :
+The project uses Adam:
 
 ```text
-learning rate = 0,001
+learning rate = 0.001
 ```
 
-Adam est une méthode d'optimisation basée sur la descente de gradient.
+Adam is an optimization method based on gradient descent.
 
-Il adapte les mises à jour en tenant compte de l'historique récent des gradients.
+It adapts parameter updates using the recent history of the gradients.
 
-Le principe général reste :
+The general principle remains:
 
 ```text
-paramètre
+parameter
 =
-paramètre
+parameter
 -
-correction déterminée à partir du gradient
+correction determined from the gradient
 ```
 
 ---
 
-# 14. Entraînement
+# 14. Training
 
-Le réseau est entraîné avec de nouveaux scénarios simulés à chaque itération.
+The network is trained using newly simulated scenarios at each iteration.
 
-Une configuration utilisée est par exemple :
-
-```text
-batch size = 2048 trajectoires
-nombre d'itérations = 3000
-```
-
-Cela représente plus de six millions de trajectoires présentées au réseau au cours de l'entraînement.
-
-Elles ne sont pas toutes stockées simultanément :
+One configuration used is:
 
 ```text
-génération d'un batch
-→ entraînement
-→ suppression du batch
-→ nouveau batch
+batch size = 2048 paths
+number of iterations = 3000
 ```
 
-Le graphique de convergence est enregistré dans :
+This represents more than six million paths presented to the network during training.
+
+They are not all stored simultaneously:
+
+```text
+generate one batch
+→ train
+→ discard the batch
+→ generate a new batch
+```
+
+The convergence figure is saved in:
 
 ```text
 figures/training_loss.png
 ```
 
-![Loss d'entraînement](figures/training_loss.png)
+![Training Loss](figures/training_loss.png)
 
-On cherche à observer une diminution puis une stabilisation de la loss de validation.
+The goal is to observe a decrease and then stabilization of the validation loss.
 
 ---
 
-# 15. Training, validation et test
+# 15. Training, Validation and Test
 
-Trois types de trajectoires sont distingués.
+Three types of simulated paths are distinguished.
 
 ## Training
 
-Les trajectoires d'entraînement servent à :
+Training paths are used to:
 
 ```text
-calculer la loss
-calculer les gradients
-modifier les paramètres
+compute the loss
+compute the gradients
+update the parameters
 ```
 
 ## Validation
 
-Des trajectoires fixes servent à suivre les performances pendant l'entraînement.
+A fixed set of paths is used to monitor performance during training.
 
-Elles ne sont jamais utilisées pour modifier directement les poids.
+These paths are never directly used to update the weights.
 
-Elles permettent de vérifier que le réseau améliore réellement sa capacité de généralisation.
+They make it possible to verify that the network is genuinely improving its ability to generalize.
 
 ## Test
 
-Un troisième ensemble de trajectoires est utilisé uniquement pour la comparaison finale.
+A third set of paths is used only for the final comparison.
 
 ```text
 train
-→ apprentissage
+→ learning
 
 validation
-→ contrôle pendant l'apprentissage
+→ monitoring during learning
 
 test
-→ évaluation finale
+→ final evaluation
 ```
 
 ---
 
-# 16. Sauvegarde du réseau
+# 16. Saving the Network
 
-Après l'entraînement, les paramètres appris sont sauvegardés dans :
+After training, the learned parameters are saved in:
 
 ```text
 models/hedging_network.pt
 ```
 
-Le checkpoint contient notamment :
+The checkpoint contains, among other things:
 
 ```text
-les poids et biais du réseau
-la taille des couches
-les paramètres du modèle
-certaines statistiques de validation
+the network weights and biases
+the size of the layers
+the model parameters
+some validation statistics
 ```
 
-Il peut ensuite être chargé sans réentraîner le réseau.
+It can later be loaded without retraining the network.
 
 ---
 
-# 17. Réseau non entraîné
+# 17. Untrained Network
 
-Avant entraînement, les paramètres du réseau sont essentiellement aléatoires.
+Before training, the network parameters are essentially random.
 
-Les positions produites ne possèdent donc pas encore de véritable signification financière.
+The positions produced by the network therefore do not yet have meaningful financial interpretation.
 
-Le projet compare notamment :
+The project compares:
 
 ```text
-PnL sans couverture
-PnL avec un réseau non entraîné
+PnL without hedging
+PnL with an untrained network
 ```
 
-dans :
+in:
 
 ```text
 figures/untrained_network_pnl.png
 ```
 
-![Réseau non entraîné](figures/untrained_network_pnl.png)
+![Untrained Network](figures/untrained_network_pnl.png)
 
-Cette étape sert à montrer que l'architecture seule ne suffit pas : le réseau doit apprendre à partir de la fonction de perte.
+This step illustrates that the architecture alone is not sufficient: the network must learn from the loss function.
 
 ---
 
-# 18. Delta-hedging Black-Scholes
+# 18. Black-Scholes Delta Hedging
 
-Une stratégie classique est implémentée dans :
+A classical hedging strategy is implemented in:
 
 ```text
 src/delta_hedging.py
 ```
 
-Le delta d'un call Black-Scholes est :
+The Black-Scholes delta of a call is:
 
 ```text
 delta = N(d1)
 ```
 
-où `N` représente la fonction de répartition de la loi normale standard.
+where `N` represents the cumulative distribution function of the standard normal distribution.
 
-À chaque date :
+At each date:
 
 ```text
-1. le prix actuel est observé
-2. le delta Black-Scholes est recalculé
-3. la position en actions est ajustée
-4. le compte en espèces est mis à jour
+1. the current stock price is observed
+2. the Black-Scholes delta is recomputed
+3. the stock position is adjusted
+4. the cash account is updated
 ```
 
-Le delta donne directement le nombre d'actions à détenir par call vendu.
+The delta directly gives the number of shares to hold per short call.
 
 ---
 
-# 19. Pourquoi le delta-hedging n'est-il pas parfait ?
+# 19. Why Is Delta Hedging Not Perfect?
 
-Dans la théorie Black-Scholes, la réplication parfaite suppose une couverture continuellement réajustée.
+In Black-Scholes theory, perfect replication assumes continuously rebalanced hedging.
 
-Dans ce projet, seulement 30 rééquilibrages sont réalisés sur une année.
-
-```text
-couverture théorique :
-rééquilibrage continu
-
-simulation :
-30 rééquilibrages
-```
-
-Le prix de l'action peut évoluer entre deux dates alors que la position reste inchangée.
-
-Cela crée une erreur de couverture appelée :
+In this project, only 30 rebalancing dates are used over one year.
 
 ```text
-hedging error
+theoretical hedging:
+continuous rebalancing
+
+simulation:
+30 rebalancing dates
 ```
 
-Le PnL final n'est donc pas exactement nul, même pour le delta Black-Scholes.
+The stock price can move between two dates while the hedging position remains unchanged.
+
+This creates a hedging error.
+
+The final PnL is therefore not exactly zero, even for Black-Scholes delta hedging.
 
 ---
 
-# 20. Comparaison finale
+# 20. Final Comparison
 
-Le script :
+The script:
 
 ```text
 compare_hedging.py
 ```
 
-compare trois stratégies sur exactement les mêmes trajectoires de test :
+compares three strategies using exactly the same test paths:
 
 ```text
-1. aucune couverture
-2. delta Black-Scholes
+1. no hedging
+2. Black-Scholes delta hedging
 3. deep hedging
 ```
 
-Utiliser les mêmes trajectoires est essentiel pour rendre la comparaison équitable.
+Using the same paths is essential to make the comparison fair.
 
-Le graphique final est enregistré dans :
+The final figure is saved in:
 
 ```text
 figures/pnl_comparison.png
 ```
 
-![Comparaison des PnL](figures/pnl_comparison.png)
+![PnL Comparison](figures/pnl_comparison.png)
 
 ---
 
-# 21. Mesures de performance
+# 21. Performance Metrics
 
-Plusieurs mesures sont utilisées pour comparer les distributions de PnL.
+Several metrics are used to compare the PnL distributions.
 
-## PnL moyen
+## Mean PnL
 
 ```text
-PnL moyen
+mean PnL
 =
-moyenne des PnL finaux
+average of the final PnL values
 ```
 
-Un PnL moyen proche de zéro est cohérent avec une valorisation risque-neutre correcte.
+A mean PnL close to zero is consistent with correct risk-neutral pricing.
 
 ---
 
-## Écart-type
+## Standard Deviation
 
-L'écart-type mesure la dispersion des PnL autour de leur moyenne.
+The standard deviation measures the dispersion of PnL values around their mean.
 
 ```text
-écart-type faible
-→ résultats plus concentrés
-→ risque de couverture plus faible
+low standard deviation
+→ more concentrated outcomes
+→ lower hedging risk
 ```
 
 ---
 
 ## Variance
 
-La variance est le carré de l'écart-type.
+Variance is the square of the standard deviation.
 
 ```text
 variance
 =
-moyenne des écarts au PnL moyen au carré
+average squared deviation from the mean PnL
 ```
 
-C'est également la fonction de perte utilisée pendant l'entraînement.
+It is also the loss function used during training.
 
 ---
 
 ## RMSE
 
-Le RMSE mesure la distance moyenne du PnL par rapport à zéro.
+RMSE measures the average distance of the PnL from zero.
 
 ```text
 RMSE
 =
-racine de la moyenne des PnL au carré
+square root of the average squared PnL
 ```
 
-Contrairement à la variance, le RMSE pénalise également un éventuel PnL moyen éloigné de zéro.
+Unlike variance, RMSE also penalizes a mean PnL that is far from zero.
 
 ---
 
 # 22. Value at Risk
 
-La VaR permet d'étudier les scénarios défavorables.
+VaR is used to study adverse scenarios.
 
-Pour une VaR à 95 %, on regarde le 5e percentile de la distribution du PnL.
+For a 95% VaR, the 5th percentile of the PnL distribution is considered.
 
-Exemple :
+Example:
 
 ```text
-VaR 95 % = -2,50 €
+95% VaR = -€2.50
 ```
 
-signifie qu'environ 5 % des scénarios produisent un PnL inférieur ou égal à environ `-2,50 €`.
+means that approximately 5% of the scenarios produce a PnL lower than or equal to approximately `-€2.50`.
 
 ---
 
 # 23. CVaR
 
-La CVaR étudie directement la queue gauche de la distribution.
+CVaR directly studies the left tail of the distribution.
 
-Elle correspond au PnL moyen parmi les scénarios situés au-delà de la VaR.
+It corresponds to the average PnL among the scenarios beyond the VaR threshold.
 
 ```text
-CVaR 95 %
+95% CVaR
 =
-PnL moyen parmi les 5 % pires scénarios
+average PnL among the worst 5% of scenarios
 ```
 
-Exemple :
+Example:
 
 ```text
-VaR 95 %  = -2,50 €
-CVaR 95 % = -3,40 €
+95% VaR  = -€2.50
+95% CVaR = -€3.40
 ```
 
-Cela signifie que, parmi les 5 % de scénarios les plus défavorables, la perte moyenne est d'environ 3,40 €.
+This means that among the worst 5% of scenarios, the average loss is approximately €3.40.
 
-Pour notre convention de PnL :
+With our PnL convention:
 
 ```text
-CVaR proche de zéro
-→ meilleur résultat
+CVaR closer to zero
+→ better result
 
-CVaR très négative
-→ pertes extrêmes plus importantes
+very negative CVaR
+→ larger extreme losses
 ```
 
-La CVaR permet donc d'étudier le risque extrême que la variance seule ne décrit pas complètement.
+CVaR therefore provides information about extreme risk that variance alone does not fully capture.
 
 ---
 
-# 24. Résultat principal
+# 24. Main Result
 
-Le premier résultat important est que :
+The first important result is that:
 
 ```text
-aucune couverture
-→ PnL très dispersé
+no hedging
+→ highly dispersed PnL
 ```
 
-alors que :
+whereas:
 
 ```text
-delta Black-Scholes
-→ dispersion beaucoup plus faible
+Black-Scholes delta hedging
+→ much lower dispersion
 ```
 
-Cela montre quantitativement l'intérêt d'une couverture dynamique.
+This quantitatively demonstrates the value of dynamic hedging.
 
-Après un entraînement suffisamment long, le réseau de neurones apprend également à réduire fortement la dispersion du PnL.
+After sufficiently long training, the neural network also learns to significantly reduce the dispersion of the PnL.
 
-Sa stratégie se rapproche de la couverture Black-Scholes sans avoir reçu directement la formule du delta.
+Its strategy approaches the Black-Scholes hedge without being directly given the delta formula.
 
-Le réseau apprend uniquement à partir :
-
-```text
-des trajectoires simulées
-des positions qu'il choisit
-du PnL final
-de la fonction de perte
-```
-
----
-
-# 25. Pourquoi le réseau ne bat-il pas nécessairement Black-Scholes ?
-
-Dans ce projet, les trajectoires sont simulées précisément selon les hypothèses de Black-Scholes :
+The network learns only from:
 
 ```text
-mouvement brownien géométrique
-volatilité constante
-taux constant
-absence de coûts de transaction
-marché simplifié
-```
-
-Black-Scholes possède déjà une solution analytique particulièrement adaptée à cet environnement.
-
-Il n'y a donc aucune raison de supposer qu'un réseau de neurones doit être meilleur.
-
-Le résultat intéressant est plutôt :
-
-```text
-le réseau apprend une stratégie proche
-de la solution analytique
-sans connaître explicitement cette solution
+the simulated paths
+the positions it chooses
+the final PnL
+the loss function
 ```
 
 ---
 
-# 26. Quand le deep hedging devient-il plus intéressant ?
+# 25. Why Does the Network Not Necessarily Beat Black-Scholes?
 
-L'intérêt du deep hedging augmente lorsque le problème devient trop complexe pour disposer d'une solution analytique simple.
-
-Par exemple :
+In this project, the paths are simulated exactly under the Black-Scholes assumptions:
 
 ```text
-frais de transaction
-contraintes sur les positions
-liquidité limitée
-volatilité stochastique
-plusieurs actifs
-fonctions de risque asymétriques
-instruments complexes
+geometric Brownian motion
+constant volatility
+constant interest rate
+no transaction costs
+simplified market
 ```
 
-Dans ces situations, une politique de couverture peut être directement apprise à partir d'une fonction objectif.
+Black-Scholes already provides an analytical solution that is particularly well suited to this environment.
 
----
+There is therefore no reason to assume that a neural network should outperform it.
 
-# 27. Limites du projet
-
-Ce projet constitue une introduction au deep hedging.
-
-Plusieurs hypothèses sont simplificatrices.
-
-## Modèle Black-Scholes
-
-Les trajectoires sont générées avec un mouvement brownien géométrique.
-
-Dans les marchés réels :
+The interesting result is instead:
 
 ```text
-la volatilité n'est pas constante
-les rendements ne sont pas parfaitement log-normaux
-des sauts peuvent apparaître
-les paramètres changent dans le temps
+the network learns a strategy close
+to the analytical solution
+without explicitly knowing that solution
 ```
 
 ---
 
-## Absence de frais de transaction
+# 26. When Does Deep Hedging Become More Interesting?
 
-Les achats et ventes d'actions sont considérés comme gratuits.
+Deep hedging becomes more useful when the problem becomes too complex to have a simple analytical solution.
 
-Dans la réalité, un rééquilibrage fréquent entraîne des coûts.
-
-Les frais de transaction constituent justement une situation dans laquelle le deep hedging peut devenir particulièrement intéressant.
-
----
-
-## Liquidité parfaite
-
-Le modèle suppose que toute quantité d'action peut être achetée ou vendue instantanément au prix observé.
-
-Il n'existe ni slippage ni impact de marché.
-
----
-
-## Même taux d'emprunt et de placement
-
-Le cash positif et la dette sont rémunérés au même taux sans risque.
-
-Cette hypothèse est simplificatrice.
-
----
-
-## Une seule option
-
-Le projet étudie seulement :
+For example:
 
 ```text
-un call européen
-sur un seul actif
+transaction costs
+position constraints
+limited liquidity
+stochastic volatility
+multiple assets
+asymmetric risk functions
+complex financial instruments
 ```
 
-Les portefeuilles réels peuvent contenir de nombreux produits et plusieurs facteurs de risque.
+In these situations, a hedging policy can be learned directly from an objective function.
 
 ---
 
-## Architecture simple
+# 27. Project Limitations
 
-Le réseau possède seulement :
+This project is an introduction to deep hedging.
+
+Several assumptions are simplified.
+
+## Black-Scholes Model
+
+The paths are generated using a geometric Brownian motion.
+
+In real markets:
 
 ```text
-deux couches cachées
-16 neurones par couche
+volatility is not constant
+returns are not perfectly log-normal
+jumps may occur
+parameters change over time
 ```
-
-L'objectif est pédagogique plutôt que de rechercher une architecture optimale.
 
 ---
 
-## Fonction de perte
+## No Transaction Costs
 
-Le réseau minimise principalement la variance du PnL.
+Buying and selling shares is assumed to be costless.
 
-D'autres objectifs pourraient être utilisés :
+In reality, frequent rebalancing generates transaction costs.
+
+Transaction costs are precisely one of the situations in which deep hedging can become particularly interesting.
+
+---
+
+## Perfect Liquidity
+
+The model assumes that any quantity of shares can be bought or sold instantly at the observed price.
+
+There is no slippage or market impact.
+
+---
+
+## Same Borrowing and Lending Rate
+
+Positive cash balances and debt are assumed to earn or pay the same risk-free rate.
+
+This is a simplifying assumption.
+
+---
+
+## Single Option
+
+The project only considers:
+
+```text
+one European call
+on one underlying asset
+```
+
+Real portfolios may contain many instruments and several risk factors.
+
+---
+
+## Simple Architecture
+
+The neural network contains only:
+
+```text
+two hidden layers
+16 neurons per layer
+```
+
+The objective is educational rather than to search for an optimal architecture.
+
+---
+
+## Loss Function
+
+The network mainly minimizes the variance of the PnL.
+
+Other objectives could be used:
 
 ```text
 CVaR
-utilité exponentielle
-pertes asymétriques
-contraintes réglementaires
+exponential utility
+asymmetric losses
+regulatory constraints
 ```
 
-Cela pourrait produire des politiques de couverture différentes.
+These could produce different hedging policies.
 
 ---
 
-# 28. Améliorations possibles
+# 28. Possible Extensions
 
-Plusieurs extensions naturelles sont possibles :
+Several natural extensions are possible:
 
 ```text
-ajouter des frais de transaction
-entraîner directement sur la CVaR
-utiliser un modèle de Heston
-ajouter des contraintes de position
-tester plusieurs fréquences de rebalancement
-comparer différentes architectures
-étudier différentes maturités
-étudier différents strikes
-ajouter plusieurs actifs
-tester le modèle sur des données de marché
+add transaction costs
+train directly on CVaR
+use a Heston model
+add position constraints
+test different rebalancing frequencies
+compare different neural network architectures
+study different maturities
+study different strikes
+add multiple assets
+test the model on market data
 ```
 
 ---
 
-# 29. Compétences travaillées
+# 29. Skills Developed
 
-Ce projet permet de pratiquer :
+This project provides practice with:
 
 ```text
 Python
 PyTorch
-tenseurs
-vectorisation
-réseaux de neurones
-couches linéaires
+tensors
+vectorization
+neural networks
+linear layers
 ReLU
 sigmoid
 forward pass
 backpropagation
 autograd
-descente de gradient
-optimizer Adam
+gradient descent
+Adam optimizer
 training / validation / test
-simulation Monte Carlo
-mouvement brownien géométrique
-pricing Black-Scholes
+Monte Carlo simulation
+geometric Brownian motion
+Black-Scholes pricing
 delta hedging
-gestion d'un portefeuille de couverture
+hedging portfolio management
 PnL
 variance
 RMSE
 VaR
 CVaR
-analyse des distributions
+distribution analysis
 Git
 GitHub
 ```
@@ -1140,41 +1136,42 @@ GitHub
 
 # 30. Conclusion
 
-Ce projet montre qu'un réseau de neurones peut apprendre une stratégie de couverture dynamique à partir d'un objectif financier.
+This project shows how a neural network can learn a dynamic hedging strategy from a financial objective.
 
-Le réseau ne reçoit pas directement le delta Black-Scholes.
+The network is not directly given the Black-Scholes delta.
 
-Il observe :
+It observes:
 
 ```text
-le prix relatif de l'action
-le temps restant
-la position actuellement détenue
+the relative stock price
+the remaining time
+the current position
 ```
 
-et choisit une nouvelle position.
+and chooses a new position.
 
-L'entraînement repose uniquement sur le PnL final :
+Training relies only on the final PnL:
 
 ```text
 positions
-→ portefeuille final
+→ final portfolio
 → PnL
 → loss
 → gradients
-→ amélioration des poids
+→ improved weights
 ```
 
-Dans un environnement construit selon Black-Scholes, la couverture analytique constitue naturellement une référence très performante.
+In an environment constructed according to Black-Scholes assumptions, the analytical hedge naturally provides a very strong benchmark.
 
-Après entraînement, le réseau parvient néanmoins à produire une couverture proche de cette référence.
+After training, the neural network nevertheless manages to produce a hedge close to this reference.
 
-Le projet constitue ainsi une introduction simple au principe du deep hedging et à l'utilisation du deep learning pour des problèmes de finance quantitative.
+The project therefore provides a simple introduction to deep hedging and to the use of deep learning for quantitative finance problems.
 
 ---
 
-# Avertissement
+# Disclaimer
 
-Ce projet a une vocation exclusivement éducative.
+This project is for educational purposes only.
 
-Il ne constitue pas un conseil financier ni une stratégie destinée à être utilisée directement sur les marchés réels.
+It does not constitute financial advice or a strategy intended for direct use in real financial markets.
+
